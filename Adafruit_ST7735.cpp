@@ -1,10 +1,16 @@
-/*************************************************** 
+/***************************************************
   This is a library for the Adafruit 1.8" SPI display.
   This library works with the Adafruit 1.8" TFT Breakout w/SD card
   ----> http://www.adafruit.com/products/358
   as well as Adafruit raw 1.8" TFT display
   ----> http://www.adafruit.com/products/618
- 
+
+  handfies :  add support for 1.44" TFT display merged from last update from the original
+  adafruit (ladyada) librairy
+  The 1.44" TFT breakout
+  ----> https://www.adafruit.com/product/2088
+
+
   Check out the links above for our tutorials and wiring diagrams
   These displays use SPI to communicate, 4 or 5 pins are required to
   interface (RST is optional)
@@ -29,7 +35,7 @@
 #include <SPI.h>
 #endif
 
-inline uint16_t swapcolor(uint16_t x) { 
+inline uint16_t swapcolor(uint16_t x) {
   return (x << 11) | (x & 0x07E0) | (x >> 11);
 }
 
@@ -51,7 +57,8 @@ Adafruit_ST7735::Adafruit_ST7735(uint8_t cs, uint8_t rs, uint8_t sid,
 // Constructor when using hardware SPI.  Faster, but must use SPI pins
 // specific to each board type (e.g. 11,13 for Uno, 51,52 for Mega, etc.)
 Adafruit_ST7735::Adafruit_ST7735(uint8_t cs, uint8_t rs, uint8_t rst) :
-    Adafruit_GFX(ST7735_TFTWIDTH, ST7735_TFTHEIGHT) {
+// handfies; initialise myGFX for 1.44(128) TFT instead of 180.. need cleaner way to make it auto.
+    Adafruit_GFX(ST7735_TFTWIDTH, ST7735_TFTHEIGHT_144) {
   _cs   = cs;
   _rs   = rs;
   _rst  = rst;
@@ -79,10 +86,10 @@ void Adafruit_ST7735::writecommand(uint8_t c) {
 
 void Adafruit_ST7735::writedata(uint8_t c) {
   digitalWrite(_rs, HIGH);
-  digitalWrite(_cs, LOW); 
+  digitalWrite(_cs, LOW);
   spiwrite(c);
   digitalWrite(_cs, HIGH);
-} 
+}
 #endif
 
 #ifdef __AVR__
@@ -119,19 +126,19 @@ void Adafruit_ST7735::writecommand(uint8_t c) {
 void Adafruit_ST7735::writedata(uint8_t c) {
   *rsport |=  rspinmask;
   *csport &= ~cspinmask;
-    
+
   //Serial.print("D ");
   spiwrite(c);
 
   *csport |= cspinmask;
-} 
+}
 #endif //#ifdef __AVR__
 
 #if defined(__SAM3X8E__)
 inline void Adafruit_ST7735::spiwrite(uint8_t c) {
-  
+
   //Serial.println(c, HEX);
-  
+
   if (hwSPI) {
     SPI.transfer(c);
   } else {
@@ -149,10 +156,10 @@ inline void Adafruit_ST7735::spiwrite(uint8_t c) {
 void Adafruit_ST7735::writecommand(uint8_t c) {
   rsport->PIO_CODR |=  rspinmask;
   csport->PIO_CODR  |=  cspinmask;
-  
+
   //Serial.print("C ");
   spiwrite(c);
-  
+
   csport->PIO_SODR  |=  cspinmask;
 }
 
@@ -160,12 +167,12 @@ void Adafruit_ST7735::writecommand(uint8_t c) {
 void Adafruit_ST7735::writedata(uint8_t c) {
   rsport->PIO_SODR |=  rspinmask;
   csport->PIO_CODR  |=  cspinmask;
-  
+
   //Serial.print("D ");
   spiwrite(c);
-  
+
   csport->PIO_SODR  |=  cspinmask;
-} 
+}
 #endif //#if defined(__SAM3X8E__)
 
 
@@ -261,7 +268,7 @@ static const uint8_t PROGMEM
       0x00,                   //     Boost frequency
     ST7735_PWCTR4 , 2      ,  // 10: Power control, 2 args, no delay:
       0x8A,                   //     BCLK/2, Opamp current small & Medium low
-      0x2A,  
+      0x2A,
     ST7735_PWCTR5 , 2      ,  // 11: Power control, 2 args, no delay:
       0x8A, 0xEE,
     ST7735_VMCTR1 , 1      ,  // 12: Power control, 1 arg, no delay:
@@ -288,7 +295,15 @@ static const uint8_t PROGMEM
     ST7735_RASET  , 4      ,  //  2: Row addr set, 4 args, no delay:
       0x00, 0x00,             //     XSTART = 0
       0x00, 0x9F },           //     XEND = 159
-
+      // handfies :  merged from ladyada libraries
+  Rcmd2green144[] = {              // Init for 7735R, part 2 (green 1.44 tab)
+    2,                        //  2 commands in list:
+      ST7735_CASET  , 4      ,  //  1: Column addr set, 4 args, no delay:
+        0x00, 0x00,             //     XSTART = 0
+        0x00, 0x7F,             //     XEND = 127
+      ST7735_RASET  , 4      ,  //  2: Row addr set, 4 args, no delay:
+        0x00, 0x00,             //     XSTART = 0
+        0x00, 0x7F },           //     XEND = 127
   Rcmd3[] = {                 // Init for 7735R, part 3 (red or green tab)
     4,                        //  4 commands in list:
     ST7735_GMCTRP1, 16      , //  1: Magical unicorn dust, 16 args, no delay:
@@ -368,12 +383,12 @@ void Adafruit_ST7735::commonInit(const uint8_t *cmdList) {
 #endif
 #if defined(__SAM3X8E__)
     SPI.setClockDivider(21); // 4 MHz
-    //Due defaults to 4mHz (clock divider setting of 21), but we'll set it anyway 
+    //Due defaults to 4mHz (clock divider setting of 21), but we'll set it anyway
 #endif
     SPI.setBitOrder(MSBFIRST);
     SPI.setDataMode(SPI_MODE0);
   } else {
-#if !defined(SPARK)      
+#if !defined(SPARK)
     pinMode(_sclk, OUTPUT);
     pinMode(_sid , OUTPUT);
 #endif
@@ -436,6 +451,12 @@ void Adafruit_ST7735::initR(uint8_t options) {
     commandList(Rcmd2green);
     colstart = 2;
     rowstart = 1;
+    // handfies :  merged from ladyada libraries
+  } else if(options == INITR_144GREENTAB) {
+    _height = ST7735_TFTHEIGHT_144;
+    commandList(Rcmd2green144);
+    colstart = 2;
+    rowstart = 3;
   } else {
     // colstart, rowstart left at default '0' values
     commandList(Rcmd2red);
@@ -457,7 +478,7 @@ void Adafruit_ST7735::setAddrWindow(uint8_t x0, uint8_t y0, uint8_t x1,
 
   writecommand(ST7735_CASET); // Column addr set
   writedata(0x00);
-  writedata(x0+colstart);     // XSTART 
+  writedata(x0+colstart);     // XSTART
   writedata(0x00);
   writedata(x1+colstart);     // XEND
 
@@ -473,8 +494,8 @@ void Adafruit_ST7735::setAddrWindow(uint8_t x0, uint8_t y0, uint8_t x1,
 
 void Adafruit_ST7735::pushColor(uint16_t color) {
 #if defined(SPARK)
-  digitalWrite(_rs, HIGH); 
-  digitalWrite(_cs, LOW); 
+  digitalWrite(_rs, HIGH);
+  digitalWrite(_cs, LOW);
 #endif
 #ifdef __AVR__
   *rsport |=  rspinmask;
@@ -489,7 +510,7 @@ void Adafruit_ST7735::pushColor(uint16_t color) {
   spiwrite(color);
 
 #if defined(SPARK)
-  digitalWrite(_cs, HIGH); 
+  digitalWrite(_cs, HIGH);
 #endif
 #ifdef __AVR__
   *csport |= cspinmask;
@@ -506,8 +527,8 @@ void Adafruit_ST7735::drawPixel(int16_t x, int16_t y, uint16_t color) {
   setAddrWindow(x,y,x+1,y+1);
 
 #if defined(SPARK)
-  digitalWrite(_rs, HIGH); 
-  digitalWrite(_cs, LOW); 
+  digitalWrite(_rs, HIGH);
+  digitalWrite(_cs, LOW);
 #endif
 #ifdef __AVR__
   *rsport |=  rspinmask;
@@ -522,7 +543,7 @@ void Adafruit_ST7735::drawPixel(int16_t x, int16_t y, uint16_t color) {
   spiwrite(color);
 
 #if defined(SPARK)
-    digitalWrite(_cs, HIGH); 
+    digitalWrite(_cs, HIGH);
 #endif
 #ifdef __AVR__
   *csport |= cspinmask;
@@ -544,8 +565,8 @@ void Adafruit_ST7735::drawFastVLine(int16_t x, int16_t y, int16_t h,
   uint8_t hi = color >> 8, lo = color;
 
 #if defined(SPARK)
-  digitalWrite(_rs, HIGH); 
-  digitalWrite(_cs, LOW); 
+  digitalWrite(_rs, HIGH);
+  digitalWrite(_cs, LOW);
 #endif
 #ifdef __AVR__
   *rsport |=  rspinmask;
@@ -561,7 +582,7 @@ void Adafruit_ST7735::drawFastVLine(int16_t x, int16_t y, int16_t h,
   }
 
 #if defined(SPARK)
-  digitalWrite(_cs, HIGH); 
+  digitalWrite(_cs, HIGH);
 #endif
 #ifdef __AVR__
   *csport |= cspinmask;
@@ -582,8 +603,8 @@ void Adafruit_ST7735::drawFastHLine(int16_t x, int16_t y, int16_t w,
 
   uint8_t hi = color >> 8, lo = color;
 #if defined(SPARK)
-  digitalWrite(_rs, HIGH); 
-  digitalWrite(_cs, LOW); 
+  digitalWrite(_rs, HIGH);
+  digitalWrite(_cs, LOW);
 #endif
 #ifdef __AVR__
   *rsport |=  rspinmask;
@@ -598,7 +619,7 @@ void Adafruit_ST7735::drawFastHLine(int16_t x, int16_t y, int16_t w,
     spiwrite(lo);
   }
 #if defined(SPARK)
-  digitalWrite(_cs, HIGH); 
+  digitalWrite(_cs, HIGH);
 #endif
 #ifdef __AVR__
   *csport |= cspinmask;
@@ -629,8 +650,8 @@ void Adafruit_ST7735::fillRect(int16_t x, int16_t y, int16_t w, int16_t h,
 
   uint8_t hi = color >> 8, lo = color;
 #if defined(SPARK)
-  digitalWrite(_rs, HIGH); 
-  digitalWrite(_cs, LOW); 
+  digitalWrite(_rs, HIGH);
+  digitalWrite(_cs, LOW);
 #endif
 #ifdef __AVR__
   *rsport |=  rspinmask;
@@ -648,7 +669,7 @@ void Adafruit_ST7735::fillRect(int16_t x, int16_t y, int16_t w, int16_t h,
   }
 
 #if defined(SPARK)
-  digitalWrite(_cs, HIGH); 
+  digitalWrite(_cs, HIGH);
 #endif
 #ifdef __AVR__
   *csport |= cspinmask;
@@ -685,6 +706,10 @@ void Adafruit_ST7735::setRotation(uint8_t m) {
        writedata(MADCTL_MX | MADCTL_MY | MADCTL_BGR);
      }
      _width  = ST7735_TFTWIDTH;
+     // handfies :  merged from ladyada libraries
+     if (tabcolor == INITR_144GREENTAB)
+       _height = ST7735_TFTHEIGHT_144;
+     else
      _height = ST7735_TFTHEIGHT;
      break;
    case 1:
@@ -693,6 +718,10 @@ void Adafruit_ST7735::setRotation(uint8_t m) {
      } else {
        writedata(MADCTL_MY | MADCTL_MV | MADCTL_BGR);
      }
+// handfies :  merged from ladyada libraries
+     if (tabcolor == INITR_144GREENTAB)
+       _width = ST7735_TFTHEIGHT_144;
+     else
      _width  = ST7735_TFTHEIGHT;
      _height = ST7735_TFTWIDTH;
      break;
@@ -703,6 +732,10 @@ void Adafruit_ST7735::setRotation(uint8_t m) {
        writedata(MADCTL_BGR);
      }
      _width  = ST7735_TFTWIDTH;
+     // handfies :  merged from ladyada libraries
+     if (tabcolor == INITR_144GREENTAB)
+       _height = ST7735_TFTHEIGHT_144;
+     else
      _height = ST7735_TFTHEIGHT;
     break;
    case 3:
@@ -711,6 +744,10 @@ void Adafruit_ST7735::setRotation(uint8_t m) {
      } else {
        writedata(MADCTL_MX | MADCTL_MV | MADCTL_BGR);
      }
+     // handfies :  merged from ladyada libraries
+     if (tabcolor == INITR_144GREENTAB)
+       _width = ST7735_TFTHEIGHT_144;
+     else
      _width  = ST7735_TFTHEIGHT;
      _height = ST7735_TFTWIDTH;
      break;
@@ -721,4 +758,3 @@ void Adafruit_ST7735::setRotation(uint8_t m) {
 void Adafruit_ST7735::invertDisplay(boolean i) {
   writecommand(i ? ST7735_INVON : ST7735_INVOFF);
 }
-
