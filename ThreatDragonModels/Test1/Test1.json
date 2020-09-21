@@ -1,0 +1,12 @@
+{
+  "summary": {
+    "title": "Test1",
+    "owner": "Stéphane Handfield",
+    "description": "Just a test"
+  },
+  "detail": {
+    "contributors": [],
+    "diagrams": [],
+    "reviewer": "Myself"
+  }
+}
